@@ -1,3 +1,4 @@
+const AWS = require('aws-sdk');
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
   DynamoDBDocumentClient,
@@ -7,6 +8,8 @@ const {
 const express = require("express");
 const serverless = require("serverless-http");
 
+AWS.config.region = "us-east-1";
+var s3Client = new AWS.S3();
 
 const app = express();
 
@@ -64,6 +67,28 @@ app.post("/users", async function (req, res) {
     res.status(500).json({ error: "Could not create user" });
   }
 });
+
+
+app.post("/createFolder", function(req, res){
+
+  var paramsBucket = {
+    Bucket: 'apiprojectaws-dev-serverlessdeploymentbucket-ztd99sqpap6i',
+    Key: "folder-asdfghjkl/",
+    ACL: "public-read",
+    Body: "body does not matter"
+  }
+  
+  s3Client.upload(paramsBucket, function(err, data){
+    if(err){
+      console.log(err);
+    }
+    else{
+      console.log("Successfully created folder in S3");
+      console.log(data);
+    }
+  })
+
+})
 
 app.use((req, res, next) => {
   return res.status(404).json({

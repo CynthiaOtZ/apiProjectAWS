@@ -1,5 +1,7 @@
 "use strict";
 
+var AWS = require('aws-sdk');
+
 var _require = require("@aws-sdk/client-dynamodb"),
     DynamoDBClient = _require.DynamoDBClient;
 
@@ -12,6 +14,8 @@ var express = require("express");
 
 var serverless = require("serverless-http");
 
+AWS.config.region = "us-east-1";
+var s3Client = new AWS.S3();
 var app = express();
 var USERS_TABLE = process.env.USERS_TABLE;
 var client = new DynamoDBClient();
@@ -120,6 +124,22 @@ app.post("/users", function _callee2(req, res) {
       }
     }
   }, null, null, [[3, 9]]);
+});
+app.post("/createFolder", function (req, res) {
+  var paramsBucket = {
+    Bucket: 'apiprojectaws-dev-serverlessdeploymentbucket-ztd99sqpap6i',
+    Key: "folder-asdfghjkl/",
+    ACL: "public-read",
+    Body: "body does not matter"
+  };
+  s3Client.upload(paramsBucket, function (err, data) {
+    if (err) {
+      console.log(err);
+    } else {
+      console.log("Successfully created folder in S3");
+      console.log(data);
+    }
+  });
 });
 app.use(function (req, res, next) {
   return res.status(404).json({
