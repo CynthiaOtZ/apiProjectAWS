@@ -14,118 +14,88 @@ var express = require("express");
 
 var serverless = require("serverless-http");
 
+var multer = require("multer");
+
+var multerS3 = require("multer-s3");
+
+var fs = require("fs");
+
 AWS.config.region = "us-east-1";
 var s3Client = new AWS.S3();
 var app = express();
 var USERS_TABLE = process.env.USERS_TABLE;
 var client = new DynamoDBClient();
 var dynamoDbClient = DynamoDBDocumentClient.from(client);
+AWS.config.update({
+  accessKeyId: process.env.aws_access_key_id,
+  secretAccessKey: process.env.aws_secret_access_key,
+  region: "us-east-1"
+});
+var s3Client = new AWS.S3();
+var upload = multer({
+  Storage: multerS3({
+    s3: s3Client,
+    ACL: 'public-read',
+    bucket: "apiprojectaws-dev-serverlessdeploymentbucket-ztd99sqpap6i/",
+    key: function key(req, file, cb) {
+      console.log(file);
+      cb(null, file.originalname);
+    }
+  })
+});
 app.use(express.json());
-app.get("/users/:userId", function _callee(req, res) {
-  var params, _ref, Item, userId, name;
+/*
+app.get("/users/:userId", async function (req, res) {
+  const params = {
+    TableName: USERS_TABLE,
+    Key: {
+      userId: req.params.userId,
+    },
+  };
 
-  return regeneratorRuntime.async(function _callee$(_context) {
-    while (1) {
-      switch (_context.prev = _context.next) {
-        case 0:
-          params = {
-            TableName: USERS_TABLE,
-            Key: {
-              userId: req.params.userId
-            }
-          };
-          _context.prev = 1;
-          _context.next = 4;
-          return regeneratorRuntime.awrap(dynamoDbClient.send(new GetCommand(params)));
-
-        case 4:
-          _ref = _context.sent;
-          Item = _ref.Item;
-
-          if (Item) {
-            userId = Item.userId, name = Item.name;
-            res.json({
-              userId: userId,
-              name: name
-            });
-          } else {
-            res.status(404).json({
-              error: 'Could not find user with provided "userId"'
-            });
-          }
-
-          _context.next = 13;
-          break;
-
-        case 9:
-          _context.prev = 9;
-          _context.t0 = _context["catch"](1);
-          console.log(_context.t0);
-          res.status(500).json({
-            error: "Could not retreive user"
-          });
-
-        case 13:
-        case "end":
-          return _context.stop();
-      }
+  try {
+    const { Item } = await dynamoDbClient.send(new GetCommand(params));
+    if (Item) {
+      const { userId, name } = Item;
+      res.json({ userId, name });
+    } else {
+      res
+        .status(404)
+        .json({ error: 'Could not find user with provided "userId"' });
     }
-  }, null, null, [[1, 9]]);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: "Could not retreive user" });
+  }
 });
-app.post("/users", function _callee2(req, res) {
-  var _req$body, userId, name, params;
 
-  return regeneratorRuntime.async(function _callee2$(_context2) {
-    while (1) {
-      switch (_context2.prev = _context2.next) {
-        case 0:
-          _req$body = req.body, userId = _req$body.userId, name = _req$body.name;
+app.post("/users", async function (req, res) {
+  const { userId, name } = req.body;
+  if (typeof userId !== "string") {
+    res.status(400).json({ error: '"userId" must be a string' });
+  } else if (typeof name !== "string") {
+    res.status(400).json({ error: '"name" must be a string' });
+  }
 
-          if (typeof userId !== "string") {
-            res.status(400).json({
-              error: '"userId" must be a string'
-            });
-          } else if (typeof name !== "string") {
-            res.status(400).json({
-              error: '"name" must be a string'
-            });
-          }
+  const params = {
+    TableName: USERS_TABLE,
+    Item: {
+      userId: userId,
+      name: name,
+    },
+  };
 
-          params = {
-            TableName: USERS_TABLE,
-            Item: {
-              userId: userId,
-              name: name
-            }
-          };
-          _context2.prev = 3;
-          _context2.next = 6;
-          return regeneratorRuntime.awrap(dynamoDbClient.send(new PutCommand(params)));
-
-        case 6:
-          res.json({
-            userId: userId,
-            name: name
-          });
-          _context2.next = 13;
-          break;
-
-        case 9:
-          _context2.prev = 9;
-          _context2.t0 = _context2["catch"](3);
-          console.log(_context2.t0);
-          res.status(500).json({
-            error: "Could not create user"
-          });
-
-        case 13:
-        case "end":
-          return _context2.stop();
-      }
-    }
-  }, null, null, [[3, 9]]);
+  try {
+    await dynamoDbClient.send(new PutCommand(params));
+    res.json({ userId, name });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: "Could not create user" });
+  }
 });
-app.post("/createFolder", function (req, res) {
+*/
+
+app.post("/createFolder", upload.array('image'), function (req, res) {
   var paramsBucket = {
     Bucket: 'apiprojectaws-dev-serverlessdeploymentbucket-ztd99sqpap6i',
     Key: "folder-asdfghjkl/",
@@ -136,8 +106,18 @@ app.post("/createFolder", function (req, res) {
     if (err) {
       console.log(err);
     } else {
-      console.log("Successfully created folder in S3");
-      console.log(data);
+      console.log("Successfully created folder in S3"); //res.status(500).json({ success: "Successfully created folder in S3" });
+
+      res.send({
+        message: "Uploaded",
+        urls: req.files.map(function (file) {
+          return {
+            url: file.location,
+            name: file.key,
+            type: file.mimetype
+          };
+        })
+      });
     }
   });
 });

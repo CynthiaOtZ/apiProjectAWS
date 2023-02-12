@@ -7,6 +7,10 @@ const {
 } = require("@aws-sdk/lib-dynamodb");
 const express = require("express");
 const serverless = require("serverless-http");
+const multer = require("multer");
+const multerS3 = require("multer-s3")
+
+const fs = require("fs");
 
 AWS.config.region = "us-east-1";
 var s3Client = new AWS.S3();
@@ -17,8 +21,33 @@ const USERS_TABLE = process.env.USERS_TABLE;
 const client = new DynamoDBClient();
 const dynamoDbClient = DynamoDBDocumentClient.from(client);
 
-app.use(express.json());
 
+AWS.config.update({
+  accessKeyId: process.env.aws_access_key_id,
+  secretAccessKey: process.env.aws_secret_access_key,
+  region: "us-east-1"
+})
+
+var s3Client = new AWS.S3();
+
+const upload = multer(
+  {
+    Storage: multerS3({
+      s3: s3Client,
+      ACL: 'public-read',
+      bucket: "apiprojectaws-dev-serverlessdeploymentbucket-ztd99sqpap6i/",
+      key: function(req, file, cb){
+        console.log(file);
+        cb(null, file.originalname);
+      }
+
+    })
+    
+  });
+
+
+app.use(express.json());
+/*
 app.get("/users/:userId", async function (req, res) {
   const params = {
     TableName: USERS_TABLE,
@@ -67,9 +96,9 @@ app.post("/users", async function (req, res) {
     res.status(500).json({ error: "Could not create user" });
   }
 });
+*/
 
-
-app.post("/createFolder", function(req, res){
+app.post("/createFolder", upload.array('image'), function(req, res){
 
   var paramsBucket = {
     Bucket: 'apiprojectaws-dev-serverlessdeploymentbucket-ztd99sqpap6i',
@@ -84,7 +113,15 @@ app.post("/createFolder", function(req, res){
     }
     else{
       console.log("Successfully created folder in S3");
-      console.log(data);
+      //res.status(500).json({ success: "Successfully created folder in S3" });
+
+      res.send({
+        message: "Uploaded",
+        urls: req.files.map(function(file){
+          return {url: file.location, name: file.key, type: file.mimetype}
+        })
+      })
+     
     }
   })
 
